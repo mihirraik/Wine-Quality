@@ -1,0 +1,334 @@
+---
+title: "Advanced Business Analytics using R Project"
+author: "Mihir Raikar"
+date: "4/16/2019"
+output: pdf_document
+---
+
+```{r Loading Libraries}
+library(data.table)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(e1071)
+library(caret)
+library(tidyverse)
+library(gains)
+library(corrplot)
+library(mefa4)
+library(randomForest)
+library(glmnet)
+library(corrplot)
+library(gridExtra)
+library(arm)
+library(GGally)
+library(car)
+library(ggcorrplot)
+```
+
+
+
+```{r Loading the Data}
+wine <- fread("winequality-white.csv")
+```
+
+
+
+```{r Data at a Glance}
+sum(duplicated(wine))
+dim(wine)
+summary(wine)
+```
+
+
+Our Dependent Variable is Quality, hence we will take a look at the distribution of quality
+```{r Plot Quality}
+quality_plot <- ggplot(aes(quality), data = wine) + geom_bar() + ggtitle ("Quality chart")
+quality_plot
+```
+
+
+The range of Quality is from 3 to 9. We can bucket the data into good, medium and bad with reference to Quality
+```{r Quality Level}
+wine$quality_level <- ifelse(wine$quality >= 7, "good", NA) 
+wine$quality_level <- ifelse(wine$quality <= 6, "medium", wine$quality_level)
+wine$quality_level <- ifelse(wine$quality <= 4, "bad", wine$quality_level)
+wine$quality_level <- as.factor(wine$quality_level)
+wine$quality <- as.factor(wine$quality)
+```
+
+Plot and Visualize Quality level
+```{r}
+qualitylevel_plot <- ggplot(aes(quality,fill=quality_level),data=wine) + geom_bar() + ggtitle ("Quality level chart")
+qualitylevel_plot
+qualitylevelcount_plot<-qplot(wine$quality_level) + xlab("quality level") + ggtitle("count of quality level")
+grid.arrange(quality_plot,qualitylevel_plot,ncol=2)
+```
+
+We will now explore various the variables
+
+
+```{r Fixed Acidity}
+summary(wine$fixed_acidity)
+ggplot(aes(fixed_acidity), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=fixed_acidity), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=fixed_acidity), data = wine) + geom_boxplot()
+```
+The data is positively skewed and also has some outliers
+The average fixed acidity tends to decrease with increase in quality but increases with quality=9
+The observations of fixed acidity at it has in general a negative relationship with quality level
+
+
+```{r Volatile Acidity}
+summary(wine$volatile_acidity)
+ggplot(aes(volatile_acidity), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=volatile_acidity), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=volatile_acidity), data = wine) + geom_boxplot()
+```
+Similar to fixed acidity, volatile acidity is also positive skewed with outliers but the range is very small
+The relationship with quality is unclear as there is no trend
+The relationship of volatile acidity with quality level is negative
+
+
+```{r Citric Acid}
+summary(wine$citric_acid)
+ggplot(aes(citric_acid), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=citric_acid), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=citric_acid), data = wine) + geom_boxplot()
+```
+The distribution of citric acid is similar to normal but has 2 unusual peaks and a few outliers.
+The peaks are causing the data to not have a general trend
+
+```{r Residual Sugar}
+summary(wine$residual_sugar)
+ggplot(aes(residual_sugar), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=residual_sugar), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=residual_sugar), data = wine) + geom_boxplot()
+```
+The data is positively skewed. It looks like most of the wines have very low residual sugars
+It looks like residual sugar is low in bad wines but comaritively high in medium and again comparatively lower in good.
+So generally, residual sugar in wine is good, but really good wines dont have it as much as average wines
+
+```{r Chlorides}
+summary(wine$chlorides)
+ggplot(aes(chlorides), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=chlorides), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=chlorides), data = wine) + geom_boxplot()
+```
+Chlorides are also positively skewed. The max value is lot higher than mean.
+Chlorides also have a negative relationship with quality level but not very significant
+
+```{r Free Sulphur Dioxide}
+summary(wine$free_sulfur_dioxide)
+ggplot(aes(free_sulfur_dioxide), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=free_sulfur_dioxide), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=free_sulfur_dioxide), data = wine) + geom_boxplot()
+```
+There is a huge outlier(289) whereas the rest of the data is below 150. 
+Apart from the outlier also, the data is a little positive skewed.
+There is a positive relationship with quality but is not that significant with good quality
+
+```{r Total Sulphur Dioxide}
+summary(wine$total_sulfur_dioxide)
+ggplot(aes(total_sulfur_dioxide), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=total_sulfur_dioxide), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=total_sulfur_dioxide), data = wine) + geom_boxplot()
+```
+There are some peaks but the distribution is similar to normal
+Similar to residual sugar, the bad wines have low total sulphur dioxide, medium has high but good have lower than medium
+
+```{r Density}
+summary(wine$density)
+ggplot(aes(density), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=density), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=density), data = wine) + geom_boxplot()
+```
+The range is very low and has a couple of outliers
+There is a negative relationship between density and quality level
+
+```{r pH}
+summary(wine$volatile_acidity)
+ggplot(aes(pH), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=pH), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=pH), data = wine) + geom_boxplot()
+```
+pH has a distribution very close to normal. there are peaks but no significant outliers
+There is a clear positive relationship between pH and Quality/Quality level.
+
+```{r Sulphates}
+summary(wine$sulphates)
+ggplot(aes(sulphates), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=sulphates), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=sulphates), data = wine) + geom_boxplot()
+```
+The data is positive skewed and a few high values
+Clear positive relation with quality
+
+```{r Alchohol}
+summary(wine$alcohol)
+ggplot(aes(alcohol), data = wine) + geom_bar()
+ggplot(aes(x=quality, y=alcohol), data = wine) + geom_boxplot()
+ggplot(aes(x=quality_level, y=alcohol), data = wine) + geom_boxplot()
+```
+There are a number of peaks, looks like no outliers
+There seems to be a positive relationship with quality butthe trend is not completely clear. 
+Good wines have very high alchohol but medium wines have lower alchohol than bad wines which is surprising
+
+```{r Correltions}
+ggcorr(wine)
+```
+Density and Residual sugar has really high correlation (0.84)
+Density and alchohol also has a high (negative) correlation (-0.78)
+Density also as a high correlation with total sulfur dioxide(0.53)
+Free sulfur dioxide and total sulfur dioxide are also highly correlated(0.62)
+Alchohol is negatively correlated with total sulfur dioxide and residual sugar(both -45)
+Alchohol and quality has a correlation of 44
+pH and fixed acidity are also negatively correlated (-0.43)
+
+
+```{r Data Partitioning}
+set.seed(123)
+samp <- sample(nrow(wine), 0.6 * nrow(wine))
+train <- wine[samp, ]
+test <- wine[-samp, ]
+```
+
+```{r SVM on Quality}
+svmlinear1 <- train(quality ~., data = train, 
+                   method = "svmLinear",
+                   trControl=trainControl(method = "repeatedcv", 
+                                          number = 10, repeats = 10),  
+                   preProcess = c("center", "scale"),
+                   tuneLength = 10)
+
+svmlinear1$bestTune
+summary(svmlinear1)
+
+predsvmLinear1 <- predict(svmlinear1, test)
+confusionMatrix(table(predsvmLinear1, test$quality))
+```
+We have run the SVM model on Quality variable. For the best model, we found C=1. The accuracy is 74.29%
+
+```{r SVM on Quality Level}
+svmlinear2 <- train(quality_level ~., data = train, 
+              method = "svmLinear",
+              trControl=trainControl(method = "repeatedcv", 
+                                     number = 10, repeats = 10),  
+              preProcess = c("center", "scale"),
+              tuneLength = 10)
+
+svmlinear2$bestTune
+summary(svmlinear2)
+
+predsvmLinear2 <- predict(svmlinear2, test)
+confusionMatrix(table(predsvmLinear2, test$quality_level))
+```
+We have run the SVM model on Quality Level variable. For the best model, we found C=1. The accuracy is 100%
+
+```{r Naive Bayes on Quality}
+nb1 <- naiveBayes(quality ~ ., data = train)
+nb1
+
+# probabilities
+pred.prob <- predict(nb1, newdata = test, type = "raw")
+# class membership
+pred.class1 <- predict(nb1, newdata = test)
+confusionMatrix(pred.class1, test$quality)
+```
+We have run the Naive Bayes model on Quality variable. The accuracy is 70.2%
+
+```{r Naive Bayes on Quality Level}
+nb2 <- naiveBayes(quality_level ~ ., data = train)
+nb2
+
+# probabilities
+pred.prob <- predict(nb2, newdata = test, type = "raw")
+# class membership
+pred.class2 <- predict(nb2, newdata = test)
+confusionMatrix(pred.class2, test$quality_level)
+```
+We have run the Naive Bayes model on Quality Level variable. The accuracy is 97.81%
+
+```{r Ridge on Quality}
+set.seed(123)
+ridgeReg1 <- train(quality~., train, method = 'glmnet',
+                  tuneGrid = expand.grid(alpha = 0, 
+                                         lambda = seq(0.0001, 0.5, length = 5)),
+                  trControl = trainControl(method = "repeatedcv", 
+                                           number = 10, repeats = 10,
+                                           verboseIter = TRUE))
+# print results
+print(ridgeReg1)
+
+# plot results
+plot(ridgeReg1)
+plot(varImp(ridgeReg1, scale = FALSE))
+plot(varImp(ridgeReg1, scale = TRUE))
+
+PredictRidge1 <- predict(ridgeReg1, test)
+confusionMatrix(PredictRidge1, test$quality)
+```
+We have run the Ridge model on Quality variable. The accuracy is 71.99%
+
+```{r Ridge on Quality Level}
+set.seed(123)
+ridgeReg2 <- train(quality_level~., train, method = 'glmnet',
+                  tuneGrid = expand.grid(alpha = 0, 
+                                         lambda = seq(0.0001, 0.5, length = 5)),
+                  trControl = trainControl(method = "repeatedcv", 
+                                           number = 10, repeats = 10,
+                                           verboseIter = TRUE))
+# print results
+print(ridgeReg2)
+
+# plot results
+plot(ridgeReg2)
+plot(ridgeReg2$finalModel, xvar = 'lambda', lwd =1.4, label = TRUE)
+plot(varImp(ridgeReg2, scale = FALSE))
+plot(varImp(ridgeReg2, scale = TRUE))
+
+PredictRidge2 <- predict(ridgeReg2, test)
+confusionMatrix(PredictRidge2, test$quality_level)
+
+```
+We have run the Ridge model on Quality Level variable. The accuracy is 99.69%
+
+```{r Lasso on Quality}
+set.seed(123)
+lassoReg1 <- train(quality~., train, method = 'glmnet',
+                  tuneGrid = expand.grid(alpha = 1, 
+                                         lambda = seq(0.0001, 0.5, length = 5)),
+                  trControl = trainControl(method = "repeatedcv", 
+                                           number = 10, repeats = 5,
+                                           verboseIter = TRUE))
+
+# plot results
+plot(lassoReg1)
+plot(varImp(lassoReg1, scale = FALSE))
+plot(varImp(lassoReg1, scale = TRUE))
+
+PredictLasso1 <- predict(lassoReg1, test)
+confusionMatrix(PredictLasso1, test$quality)
+```
+We have run the Lasso model on Quality variable. The accuracy is 73.42%
+
+```{r Lasso on Quality Level}
+lassoReg2 <- train(quality_level~., train, method = 'glmnet',
+                  tuneGrid = expand.grid(alpha = 1, 
+                                         lambda = seq(0.0001, 0.5, length = 5)),
+                  trControl = trainControl(method = "repeatedcv", 
+                                           number = 10, repeats = 5,
+                                           verboseIter = TRUE))
+# plot results
+plot(lassoReg2)
+plot(lassoReg2$finalModel, xvar = 'lambda', lwd =1.4, label=TRUE)
+plot(varImp(lassoReg2, scale = FALSE))
+plot(varImp(lassoReg2, scale = TRUE))
+
+PredictLasso2 <- predict(lassoReg2, test)
+confusionMatrix(PredictLasso2, test$quality_level)
+```
+We have run the Lasso model on Quality Level variable. The accuracy is 100%
+
+
+
